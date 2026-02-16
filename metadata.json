@@ -1,0 +1,5 @@
+{
+  "name": "Eidolon: IF Fallback Engine",
+  "description": "A testbed for the Eidolon plugin—a Ghost in the Machine for Interactive Fiction. It uses LLMs to handle parser fallbacks, inventing consistent world details while adhering to author constraints and style.",
+  "requestFramePermissions": []
+}
