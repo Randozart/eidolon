@@ -1,19 +1,19 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { WorldFact, Constraint, EidolonResponse } from "../types";
 
-const getAiClient = () => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const getAiClient = (runtimeKey?: string) => {
+  const apiKey = runtimeKey || import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("API Key is missing. Please set VITE_GEMINI_API_KEY in .env");
+    throw new Error("API Key is missing. Please set VITE_GEMINI_API_KEY in .env or enter one in the sidebar.");
   }
   return new GoogleGenAI({ apiKey });
 };
 
-export const analyzeAuthorStyle = async (sampleText: string): Promise<string> => {
+export const analyzeAuthorStyle = async (sampleText: string, runtimeKey?: string): Promise<string> => {
   if (!sampleText.trim()) return "Standard Interactive Fiction tone: Descriptive, second-person, neutral.";
 
   try {
-    const ai = getAiClient();
+    const ai = getAiClient(runtimeKey);
     const model = "gemini-3-flash-preview";
 
     const prompt = `
@@ -43,10 +43,11 @@ export const queryEidolon = async (
   history: string[],
   facts: WorldFact[],
   constraints: Constraint[],
-  authorStyle: string
+  authorStyle: string,
+  runtimeKey?: string
 ): Promise<EidolonResponse> => {
   try {
-    const ai = getAiClient();
+    const ai = getAiClient(runtimeKey);
     const model = "gemini-3-flash-preview";
 
     const factList = facts.map(f => `${f.key}: ${f.value}`).join("\n");

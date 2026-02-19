@@ -3,12 +3,12 @@ import Console from './components/Console';
 import ConfigPanel from './components/ConfigPanel';
 import type { WorldFact, Constraint, LogEntry, EidolonModule, GameEngine } from './types';
 import { queryEidolon } from './services/geminiService';
-import { Ghost, AlertTriangle } from 'lucide-react';
+import { Ghost, KeyRound } from 'lucide-react';
 import { DialogBridge } from './engines/DialogBridge';
 
-// Default module — story.z8 is served from /public
+// Default module — CloakOfDarkness.z8 is served from /public
 const STORY_MODULE: EidolonModule = {
-  name: "Story",
+  name: "Cloak of Darkness",
   description: "Interactive fiction story (Z-Machine).",
   version: "1.0",
   engineType: "z-machine",
@@ -32,13 +32,12 @@ export default function App() {
   // Engine State
   const engineRef = React.useRef<GameEngine | null>(null);
 
-  const [apiKeyMissing, setApiKeyMissing] = useState(false);
+  const [userApiKey, setUserApiKey] = useState('');
+  const effectiveApiKey = userApiKey.trim() || import.meta.env.VITE_GEMINI_API_KEY || '';
+  const apiKeyMissing = !effectiveApiKey;
 
   useEffect(() => {
-    if (!import.meta.env.VITE_GEMINI_API_KEY) {
-        setApiKeyMissing(true);
-    }
-    fetch('/story.z8')
+    fetch('/CloakOfDarkness.z8')
       .then(res => res.arrayBuffer())
       .then(buf => handleLoadModule({ ...STORY_MODULE, binaryData: new Uint8Array(buf) }));
   }, []);
@@ -71,11 +70,6 @@ export default function App() {
 
   const handleCommand = async () => {
     if (!input.trim()) return;
-    if (apiKeyMissing) {
-        alert("API Key is missing. Check logs or environment variables.");
-        return;
-    }
-
     const command = input.trim();
     setInput('');
     
@@ -128,9 +122,19 @@ export default function App() {
 
       } else {
         // EIDOLON FALLBACK: parser did not handle the command.
+        if (apiKeyMissing) {
+          setLogs(prev => [...prev, {
+            id: Date.now().toString(),
+            type: 'system',
+            text: "Eidolon fallback requires a Gemini API key. Enter one in the sidebar.",
+            timestamp: Date.now()
+          }]);
+          setIsLoading(false);
+          return;
+        }
         const history = logs.map(l => `${l.type.toUpperCase()}: ${l.text}`);
         const currentFactsForLLM = newFactsFromEngine.length > 0 ? newFactsFromEngine : facts;
-        const llmResponse = await queryEidolon(command, history, currentFactsForLLM, constraints, authorStyle);
+        const llmResponse = await queryEidolon(command, history, currentFactsForLLM, constraints, authorStyle, effectiveApiKey);
 
         parserResponse = llmResponse.narrative;
         const mechanicalActions = llmResponse.mechanicalActions || [];
@@ -185,17 +189,6 @@ export default function App() {
     }
   };
 
-  if (apiKeyMissing) {
-      return (
-        <div className="flex items-center justify-center h-screen bg-black text-white p-4">
-            <div className="max-w-md text-center space-y-4 border border-red-900 bg-red-950/20 p-8 rounded-lg">
-                <AlertTriangle className="w-12 h-12 text-red-500 mx-auto" />
-                <h1 className="text-xl font-bold font-mono">API Key Missing</h1>
-                <p className="text-gray-400">The Eidolon engine requires a valid Gemini API key to function. Please set <code className="text-red-300">VITE_GEMINI_API_KEY</code> in your .env file.</p>            </div>
-        </div>
-      );
-  }
-
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-black text-gray-200 font-sans">
       {/* Sidebar: Configuration */}
@@ -205,15 +198,39 @@ export default function App() {
           <h1 className="font-mono text-lg font-bold tracking-wider text-eidolon-100">EIDOLON</h1>
           <span className="text-[10px] text-eidolon-600 bg-eidolon-950 px-1 rounded border border-eidolon-900 ml-auto">DEV_BUILD</span>
         </div>
+
+        {/* API Key Input */}
+        <div className="px-4 py-3 border-b border-eidolon-900/30 bg-void-950/50">
+          <div className="flex items-center gap-1.5 mb-1">
+            <KeyRound size={11} className="text-gray-500" />
+            <label className="text-[10px] uppercase font-bold tracking-wider text-gray-500">Gemini API Key</label>
+          </div>
+          <input
+            type="password"
+            value={userApiKey}
+            onChange={(e) => setUserApiKey(e.target.value)}
+            placeholder={import.meta.env.VITE_GEMINI_API_KEY ? "Using local key…" : "Enter API key…"}
+            className={`w-full bg-void-950 border rounded px-2 py-1.5 text-xs text-white outline-none transition-colors ${
+              apiKeyMissing
+                ? 'border-red-800 focus:border-red-500 placeholder-red-900'
+                : 'border-gray-700 focus:border-eidolon-500'
+            }`}
+          />
+          {apiKeyMissing && (
+            <p className="text-[10px] text-red-400 mt-1">Required for the Eidolon fallback.</p>
+          )}
+        </div>
+
         <div className="flex-1 overflow-hidden">
-          <ConfigPanel 
-            facts={facts} 
+          <ConfigPanel
+            facts={facts}
             setFacts={setFacts}
             constraints={constraints}
             setConstraints={setConstraints}
             authorStyle={authorStyle}
             setAuthorStyle={setAuthorStyle}
             onLoadModule={handleLoadModule}
+            runtimeApiKey={effectiveApiKey}
           />
         </div>
       </div>

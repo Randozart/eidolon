@@ -1,7 +1,25 @@
 import React, { useState, useRef } from 'react';
 import { WorldFact, Constraint, EidolonModule } from '../types';
-import { Plus, Trash2, Wand2, Lock, Globe, Feather, Info, Package, FileCode } from 'lucide-react';
+import { Plus, Trash2, Wand2, Lock, Globe, Feather, Info, Package, FileCode, BookOpen, Play } from 'lucide-react';
 import { analyzeAuthorStyle } from '../services/geminiService';
+
+interface PresetEntry {
+  id: string;
+  name: string;
+  description: string;
+  url: string;
+  authorStyle: string;
+}
+
+const PRESET_LIBRARY: PresetEntry[] = [
+  {
+    id: 'cloak-of-darkness',
+    name: 'Cloak of Darkness',
+    description: 'A short demonstration adventure by Roger Firth. The canonical "Hello World" of Interactive Fiction.',
+    url: '/CloakOfDarkness.z8',
+    authorStyle: 'Standard Interactive Fiction. Terse, descriptive, second-person, neutral tone.',
+  },
+];
 
 interface ConfigPanelProps {
   facts: WorldFact[];
@@ -11,6 +29,7 @@ interface ConfigPanelProps {
   authorStyle: string;
   setAuthorStyle: (s: string) => void;
   onLoadModule: (module: EidolonModule) => void;
+  runtimeApiKey?: string;
 }
 
 const ConfigPanel: React.FC<ConfigPanelProps> = ({
@@ -20,7 +39,8 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
   setConstraints,
   authorStyle,
   setAuthorStyle,
-  onLoadModule
+  onLoadModule,
+  runtimeApiKey,
 }) => {
   const [activeTab, setActiveTab] = useState<'facts' | 'constraints' | 'style' | 'modules'>('facts');
   const [newFactKey, setNewFactKey] = useState('');
@@ -28,7 +48,8 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
   const [newConstraint, setNewConstraint] = useState('');
   const [sampleText, setSampleText] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  
+  const [loadingPreset, setLoadingPreset] = useState<string | null>(null);
+
   /* const jsonInputRef = useRef<HTMLInputElement>(null); */
   const zCodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,9 +84,33 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
 
   const handleAnalyzeStyle = async () => {
     setIsAnalyzing(true);
-    const style = await analyzeAuthorStyle(sampleText);
+    const style = await analyzeAuthorStyle(sampleText, runtimeApiKey);
     setAuthorStyle(style);
     setIsAnalyzing(false);
+  };
+
+  const handleLoadPreset = async (preset: PresetEntry) => {
+    setLoadingPreset(preset.id);
+    try {
+      const res = await fetch(preset.url);
+      const buf = await res.arrayBuffer();
+      const module: EidolonModule = {
+        name: preset.name,
+        description: preset.description,
+        version: '1.0',
+        authorStyle: preset.authorStyle,
+        facts: [],
+        constraints: [],
+        intro: '',
+        engineType: 'z-machine',
+        binaryData: new Uint8Array(buf),
+      };
+      onLoadModule(module);
+    } catch (err) {
+      console.error('Failed to load preset:', err);
+    } finally {
+      setLoadingPreset(null);
+    }
   };
 
   /* const handleExport = () => {
@@ -197,6 +242,32 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
                     Select Story File
                   </button>
                   <input type="file" accept=".z5,.z8,.ulx" ref={zCodeInputRef} className="hidden" onChange={handleZCodeUpload} />
+               </div>
+
+               {/* PRESET LIBRARY */}
+               <div className="bg-void-950 p-4 rounded border border-eidolon-900/50 flex flex-col gap-3">
+                  <div className="flex items-center gap-2 text-eidolon-200 font-bold text-sm">
+                    <BookOpen size={16} /> Story Library
+                  </div>
+                  <p className="text-xs text-gray-500">Preset adventure modules ready to play.</p>
+                  <div className="flex flex-col gap-2">
+                    {PRESET_LIBRARY.map(preset => (
+                      <div key={preset.id} className="flex items-start justify-between gap-3 p-3 bg-void-900 rounded border border-gray-800">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-eidolon-200">{preset.name}</div>
+                          <div className="text-xs text-gray-500 mt-0.5 leading-snug">{preset.description}</div>
+                        </div>
+                        <button
+                          onClick={() => handleLoadPreset(preset)}
+                          disabled={loadingPreset === preset.id}
+                          className="shrink-0 bg-eidolon-700 hover:bg-eidolon-600 disabled:bg-gray-700 text-white py-1.5 px-3 rounded text-xs transition-colors flex items-center gap-1.5"
+                        >
+                          <Play size={11} />
+                          {loadingPreset === preset.id ? 'Loading…' : 'Load'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                </div>
 
                {/* JSON IMPORT — disabled for initial release
