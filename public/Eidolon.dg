@@ -5,7 +5,7 @@
 %% ===========================================================================
 (dynamic (object $ has narrative $))
 
-%% Injection Logic: Used by the LLM to change the world state
+%% Injection Logic used by the LLM to change the world state
 (grammar [eidolon_note [object] [any]] for [eidolon_note $ $])
 
 (perform [eidolon_note $Obj $Words])
@@ -19,14 +19,14 @@
     (try $Words)
     [ACK_INJECTION] (line)
 
-%% 1. Catch-all: for ANY input, offer eidolon_fallback as a possible action.
+%% For ANY input, offer eidolon_fallback as a possible action.
 (understand $Words as [eidolon_fallback])
     ($Words = [$ | $])   %% only match non-empty word lists
 
-%% 2. Make the fallback action extremely unlikely.
+%% Make the fallback action extremely unlikely.
 (very unlikely [eidolon_fallback])
 
-%% 3. Explicitly allow this action, bypassing any refusal or prevention rules.
+%% Explicitly allow this action, bypassing any refusal or prevention rules.
 (allow [eidolon_fallback])
     (true)
 
