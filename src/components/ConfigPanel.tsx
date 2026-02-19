@@ -42,7 +42,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
   onLoadModule,
   runtimeApiKey,
 }) => {
-  const [activeTab, setActiveTab] = useState<'facts' | 'constraints' | 'style' | 'modules'>('facts');
+  const [activeTab, setActiveTab] = useState<'facts' | 'constraints' | 'style' | 'modules'>('modules');
   const [newFactKey, setNewFactKey] = useState('');
   const [newFactValue, setNewFactValue] = useState('');
   const [newConstraint, setNewConstraint] = useState('');

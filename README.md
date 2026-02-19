@@ -10,7 +10,7 @@ Player input
     ▼
 DialogBridge                    src/engines/DialogBridge.ts
     │  Runs Bocfel (Z-Machine WASM interpreter via emglken)
-    │  Feeds story.z8 binary to the VM via an in-memory virtual filesystem
+    │  Feeds the story binary to the VM via an in-memory virtual filesystem
     │  Parses [EIDOLON_STATE] / [EIDOLON_FALLBACK] tags from VM output
     │
     ├─ parser handled it ──▶ display output, update sidebar state
@@ -31,134 +31,45 @@ DialogBridge                    src/engines/DialogBridge.ts
    npm install
    ```
 
-2. Create `.env.local` at the project root:
+2. Optionally create `.env.local` at the project root with a Gemini API key for local development:
    ```
    VITE_GEMINI_API_KEY=your_key_here
    ```
+   If no environment key is set, you can enter one at runtime using the **Gemini API Key** field in the sidebar.
 
 3. Start the dev server:
    ```
    npm run dev
    ```
 
-The default story (`public/story.z8`) loads automatically at startup.
+The default story (`public/CloakOfDarkness.z8`) loads automatically at startup. Additional stories can be loaded from the **Story Library** in the sidebar, or by uploading your own `.z5`/`.z8` file.
 
 ---
 
 ## Writing Eidolon-Compatible Dialog Stories
 
-To integrate a Dialog story with Eidolon, your `.dg` source must include two blocks:
-
-- **The Eidolon Layer** — wires up the protocol commands and installs the state-emitter hook
-- **The JSON State Exporter** — serialises world state after each turn
-
-### The Eidolon Layer
+To integrate a Dialog story with Eidolon, include the Eidolon library at the top of your `.dg` source file:
 
 ```dialog
-%% ===========================================================================
-%% Eidolon Layer
-%% ===========================================================================
-(dynamic (object $ has narrative $))
-
-%% eidolon_note: called by the LLM to attach a narrative fact to a game object.
-(grammar [eidolon_note [object] [any]] for [eidolon_note $ $])
-
-(perform [eidolon_note $Obj $Words])
-    *(object $Obj)
-    (now) ($Obj has narrative $Words)
-    [ACK_INJECTION] (line)
-
-%% eidolon_force: called by the LLM to execute an arbitrary game command.
-(grammar [eidolon_do [any]] for [eidolon_force $])
-
-(perform [eidolon_force $Words])
-    (try $Words)
-    [ACK_INJECTION] (line)
-
-%% Fallback action: catches any input the parser cannot understand.
-%% Marked very unlikely so Dialog only selects it as a last resort.
-(understand $Words as [eidolon_fallback])
-    ($Words = [$ | $])
-
-(very unlikely [eidolon_fallback])
-
-(allow [eidolon_fallback])
-    (true)
-
-(perform [eidolon_fallback])
-    (line)
-    \[EIDOLON_FALLBACK\]
-    (dump-eidolon-state)
-    \[\/EIDOLON_FALLBACK\] (line)
-    (stop)
-
-%% After every successful action, emit a state snapshot for the sidebar.
-(after [any $Action])
-    ($Action = $Action)
-    \[EIDOLON_STATE\]
-    (dump-eidolon-state)
-    \[\/EIDOLON_STATE\] (line)
+include Eidolon.dg
 ```
 
-### The JSON State Exporter
+`Eidolon.dg` is provided in the `public/` folder of this repository. It supplies:
 
-This defines `(dump-eidolon-state)`, which emits location, visible objects, inventory, and Eidolon-injected narrative facts as a JSON object. `DialogBridge` parses this to populate the world state sidebar.
+- **`eidolon_note`** — lets the LLM attach narrative facts to game objects
+- **`eidolon_force`** — lets the LLM execute mechanical game commands
+- **`eidolon_fallback`** — catch-all action that fires when the parser cannot handle input, triggering the LLM
+- **`dump-eidolon-state`** — serialises world state (location, visible objects, inventory, narrative facts) as JSON for the sidebar
 
-```dialog
-%% ===================================================================
-%% JSON State Exporter
-%% ===================================================================
+### Compiling
 
-(dump-eidolon-state)
-    \{\" (no space)
-    (current player $P)
-    (if) ($P has parent $Loc) (then)
-        location\":\ \" (no space)
-        (name $Loc) (no space)
-        \"\,\ \" (no space)
-    (endif)
-    visible\":\ \[ (no space)
-    (exhaust) (dump-visible-json)
-    null (no space)
-    \]\,\ \" (no space)
-    inventory\":\ \[ (no space)
-    (exhaust) (dump-inventory-json)
-    null (no space)
-    \]\,\ \" (no space)
-    narrative\":\ \{ (no space)
-    (exhaust) (dump-narrative-json)
-    \"_ignore\" (no space)
-    \:\ null (no space)
-    \} (no space)
-    \} (no space)
+Compile your `.dg` source to a Z-Machine binary using the Dialog compiler, passing `Eidolon.dg` on the include path:
 
-(dump-visible-json)
-    (current player $P)
-    ($P has parent $Loc)
-    *(everything $Obj)
-    ($Obj is in room $Loc)
-    ($Obj \= $P)
-    \" (no space)
-    (name $Obj) (no space)
-    \"\, (no space)
-
-(dump-inventory-json)
-    (current player $P)
-    *(everything $Item)
-    ($Item is in room $P)
-    \" (no space)
-    (name $Item) (no space)
-    \"\, (no space)
-
-(dump-narrative-json)
-    *(object $Obj has narrative $Fact)
-    \" (no space)
-    (name $Obj) (no space)
-    \" (no space)
-    \:\ \" (no space)
-    (print words $Fact) (no space)
-    \"\, (no space)
 ```
+dialogc -I public/ story.dg -o public/CloakOfDarkness.z8
+```
+
+Place the output in `public/` and it will be served by Vite. Load it in the app via **Story Library** or the **Import Story File** upload button.
 
 ### Protocol Reference
 
@@ -169,16 +80,6 @@ This defines `(dump-eidolon-state)`, which emits location, visible objects, inve
 | `eidolon_note <object> <words>` | Bridge → Dialog | LLM injects a narrative fact onto a game object. |
 | `eidolon_force <command>` | Bridge → Dialog | LLM executes a mechanical game command (e.g. `take lamp`). |
 
-### Compiling
-
-Compile your `.dg` source to `.z8` using the Dialog compiler:
-
-```
-dialogc story.dg -o story.z8
-```
-
-Place the output at `public/story.z8`.
-
 ---
 
 ## Public Assets
@@ -188,4 +89,5 @@ Place the output at `public/story.z8`.
 | `asyncglk.js` | Async Glk runtime required by Bocfel |
 | `bocfel.js` | Z-Machine interpreter JS wrapper |
 | `bocfel.wasm` | Z-Machine interpreter WASM binary |
-| `story.z8` | Compiled Dialog story |
+| `CloakOfDarkness.z8` | Default compiled Dialog story |
+| `Eidolon.dg` | Eidolon integration library — include this in your Dialog source |
