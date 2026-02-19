@@ -1,0 +1,99 @@
+%% Eidolon Library
+
+%% ===========================================================================
+%% Eidolon Layer
+%% ===========================================================================
+(dynamic (object $ has narrative $))
+
+%% Injection Logic: Used by the LLM to change the world state
+(grammar [eidolon_note [object] [any]] for [eidolon_note $ $])
+
+(perform [eidolon_note $Obj $Words])
+    *(object $Obj)
+    (now) ($Obj has narrative $Words)
+    [ACK_INJECTION] (line)
+
+(grammar [eidolon_do [any]] for [eidolon_force $])
+
+(perform [eidolon_force $Words])
+    (try $Words)
+    [ACK_INJECTION] (line)
+
+%% 1. Catch-all: for ANY input, offer eidolon_fallback as a possible action.
+(understand $Words as [eidolon_fallback])
+    ($Words = [$ | $])   %% only match non-empty word lists
+
+%% 2. Make the fallback action extremely unlikely.
+(very unlikely [eidolon_fallback])
+
+%% 3. Explicitly allow this action, bypassing any refusal or prevention rules.
+(allow [eidolon_fallback])
+    (true)
+
+(perform [eidolon_fallback])
+    (line)
+    \[EIDOLON_FALLBACK\]
+    (dump-eidolon-state)
+    \[\/EIDOLON_FALLBACK\] (line)
+    (stop)
+
+%% Sidebar updates after actions
+(after [any $Action])
+	($Action = $Action)
+	\[EIDOLON_STATE\]
+	(dump-eidolon-state)
+	\[\/EIDOLON_STATE\] (line)
+
+%% ===================================================================
+%% JSON State Exporter
+%% ===================================================================
+
+(dump-eidolon-state)
+	\{\" (no space)
+	(current player $P)
+	(if) ($P has parent $Loc) (then)
+		location\":\ \" (no space)
+		(name $Loc) (no space)
+		\"\,\ \" (no space)
+	(endif)
+	visible\":\ \[ (no space)
+	(exhaust) (dump-visible-json)
+	null (no space)
+	\]\,\ \" (no space)
+	inventory\":\ \[ (no space)
+	(exhaust) (dump-inventory-json)
+	null (no space)
+	\]\,\ \" (no space)
+	narrative\":\ \{ (no space)
+    (exhaust) (dump-narrative-json)
+    \"_ignore\" (no space)
+    \:\ null (no space)
+    \} (no space)
+    \} (no space)
+
+(dump-visible-json)
+	(current player $P)
+	($P has parent $Loc)
+	*(everything $Obj)
+	($Obj is in room $Loc)
+	($Obj \= $P)
+	\" (no space)
+	(name $Obj) (no space)
+	\"\, (no space)
+
+(dump-inventory-json)
+	(current player $P)
+	*(everything $Item)
+	($Item is in room $P)
+	\" (no space)
+	(name $Item) (no space)
+	\"\, (no space)
+
+(dump-narrative-json)
+    *(object $Obj has narrative $Fact)
+    \" (no space)
+    (name $Obj) (no space)
+    \" (no space)
+    \:\ \" (no space)
+    (print words $Fact) (no space)
+    \"\, (no space)
