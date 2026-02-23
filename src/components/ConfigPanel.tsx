@@ -156,18 +156,20 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
     e.target.value = '';
   }; */
 
-  const handleZCodeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStoryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const engineType: EidolonModule['engineType'] =
+      ext === 'aastory' ? 'a-machine' : 'z-machine';
 
     const reader = new FileReader();
     reader.onload = (event) => {
         if (event.target?.result) {
             const buffer = event.target.result as ArrayBuffer;
             const uint8 = new Uint8Array(buffer);
-            
-            // Create a pseudo-module wrapping this binary
-            const zModule: EidolonModule = {
+            const storyModule: EidolonModule = {
                 name: file.name,
                 description: "Loaded from binary file.",
                 version: "1.0",
@@ -175,10 +177,10 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
                 facts: [],
                 constraints: [],
                 intro: `[Loaded Binary: ${file.name}]`,
-                engineType: 'z-machine',
+                engineType,
                 binaryData: uint8
             };
-            onLoadModule(zModule);
+            onLoadModule(storyModule);
         }
     };
     reader.readAsArrayBuffer(file);
@@ -234,14 +236,14 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
                   <div className="flex items-center gap-2 text-purple-200 font-bold text-sm">
                     <FileCode size={16} /> Import Story File
                   </div>
-                  <p className="text-xs text-gray-500">Load a compiled Dialog story file (.z5, .z8).</p>
+                  <p className="text-xs text-gray-500">Load a compiled Dialog story file (.z5, .z8, .aastory).</p>
                   <button
                     onClick={() => zCodeInputRef.current?.click()}
                     className="bg-purple-800 hover:bg-purple-700 text-white py-2 px-4 rounded text-sm transition-colors flex items-center justify-center gap-2"
                   >
                     Select Story File
                   </button>
-                  <input type="file" accept=".z5,.z8,.ulx" ref={zCodeInputRef} className="hidden" onChange={handleZCodeUpload} />
+                  <input type="file" accept=".z5,.z8,.ulx,.aastory" ref={zCodeInputRef} className="hidden" onChange={handleStoryUpload} />
                </div>
 
                {/* PRESET LIBRARY */}

@@ -37,6 +37,24 @@ export interface GameEngine {
   getState(): WorldFact[];
 }
 
+// --- A-machine extended types ---
+
+/** Emitted by AaMachineBridge when a status window (top bar or inline) is updated. */
+export interface AaWindowUpdate {
+  /** 'status-top' = persistent top bar; 'status-inline' = inline block in scroll area. */
+  id: 'status-top' | 'status-inline';
+  content: string;
+}
+
+/** A resource (image, audio, video) embedded in an A-machine story. */
+export interface AaResource {
+  /** Raw URL from the story: 'file:sound.ogg' for bundled assets, or an external URL. */
+  url: string;
+  /** Fallback text shown when the resource cannot be rendered. */
+  alt: string;
+  type: 'image' | 'audio' | 'video' | 'unknown';
+}
+
 export interface EidolonModule {
   name: string;
   description: string;
@@ -46,9 +64,9 @@ export interface EidolonModule {
   constraints: Constraint[];
   intro: string;
   // If 'custom' is set, the app looks for a registered internal engine, otherwise uses simulatedParser
-  engineType?: 'simple' | 'z-machine';
+  engineType?: 'simple' | 'z-machine' | 'a-machine';
   binaryData?: Uint8Array; // For actual Z-Machine/Glulx files
-  simulatedParser?: Record<string, string>; 
+  simulatedParser?: Record<string, string>;
 }
 
 export enum Tab {

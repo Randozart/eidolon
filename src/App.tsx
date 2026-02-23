@@ -5,6 +5,7 @@ import type { WorldFact, Constraint, LogEntry, EidolonModule, GameEngine } from 
 import { queryEidolon } from './services/geminiService';
 import { Ghost, KeyRound } from 'lucide-react';
 import { DialogBridge } from './engines/DialogBridge';
+import { AaMachineBridge } from './engines/AaMachineBridge';
 
 // Default module — CloakOfDarkness.z8 is served from /public
 const STORY_MODULE: EidolonModule = {
@@ -53,6 +54,10 @@ export default function App() {
     // Initialize Engine
     if (module.engineType === 'z-machine' && module.binaryData) {
        engineRef.current = new DialogBridge(module.binaryData);
+       const startText = await engineRef.current.start();
+       initLogText = module.intro ? `${module.intro}\n\n${startText}` : startText;
+    } else if (module.engineType === 'a-machine' && module.binaryData) {
+       engineRef.current = new AaMachineBridge(module.binaryData);
        const startText = await engineRef.current.start();
        initLogText = module.intro ? `${module.intro}\n\n${startText}` : startText;
     } else {
